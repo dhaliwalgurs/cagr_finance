@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-import sys
 import unittest
-from pathlib import Path
 
 import pandas as pd
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-LIB_DIR = REPO_ROOT / "lib"
-if str(LIB_DIR) not in sys.path:
-    sys.path.insert(0, str(LIB_DIR))
-
-from cagr_finance.config import DATE_COL
-from cagr_finance.leveraged import calculate_leveraged_series
+from lib.cagr_finance.config import DATE_COL
+from lib.cagr_finance.leveraged import calculate_leveraged_series
 
 
 class CalculateLeveragedSeriesTests(unittest.TestCase):

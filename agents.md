@@ -3,21 +3,27 @@
 Last updated: 2026-03-19
 
 ## Project Goal
-Build a readable, modular Python application that estimates CAGR-related synthetic series for leveraged ETFs (TQQQ and UPRO), including inflation-adjusted values, with data sourced from FRED.
+Build a readable, modular Python application that estimates CAGR-related synthetic series for leveraged ETFs and indexes, including inflation-adjusted values, with data sourced from FRED.
 
 ## Current Architecture
+- `lib/__init__.py`
+  - Package marker so repository-level imports are cleaner.
 - `lib/cagr_finance/config.py`
-  - Central constants: FRED series IDs, CSV schema column names, and runtime settings (`AppSettings`).
+  - Central constants: FRED IDs, fixed MER/trading-day constants, security mappings, and output schema.
 - `lib/cagr_finance/fred_client.py`
-  - Pulls raw series from FRED via `pandas-datareader`.
+  - Pulls raw series via `pandas-datareader`; S&P has Stooq fallback for pre-2016 history due FRED licensing limits.
 - `lib/cagr_finance/leveraged.py`
   - Computes synthetic leveraged ETF paths from daily index returns and MER drag.
 - `lib/cagr_finance/transform.py`
   - CPI alignment to target dates and nominal-to-real conversion helpers.
 - `lib/cagr_finance/pipeline.py`
-  - End-to-end orchestration: fetch, calculate, inflation-adjust, merge, and write output.
+  - End-to-end orchestration: fetch, calculate, inflation-adjust, merge, and write output CSV.
+- `lib/cagr_finance/analysis.py`
+  - Date-window analysis API for start/end nominal, start/end real, and CAGR values.
 - `app/update_dataset.py`
   - CLI for refreshing dataset CSV (one-shot and interval mode).
+- `app/analyze_cagr.py`
+  - Main analysis CLI for CAGR-focused workflows.
 
 ## Output Schema (CSV)
 - `date`
@@ -28,23 +34,37 @@ Build a readable, modular Python application that estimates CAGR-related synthet
 - `S&P value in real terms`
 - `TQQQ in nominal terms`
 - `UPRO in nominal terms`
+- `QLD in nominal terms`
 - `TQQQ in real terms`
 - `UPRO in real terms`
+- `QLD in real terms`
 
-## Assumptions In Place
-- FRED series:
-  - NASDAQ: `NASDAQCOM`
-  - S&P 500: `SP500`
-  - CPI: `CPIAUCSL`
-- Synthetic leverage calculation:
-  - TQQQ uses `3x` NASDAQ daily return.
-  - UPRO uses `3x` S&P daily return.
-- MER treatment:
-  - Daily drag = `annual_mer / trading_days_per_year`.
-  - Applied in return formula as subtraction from leveraged daily return.
-- Inflation factor:
-  - `latest_cpi / cpi_on_date`.
-  - Monthly CPI aligned to target dates using the latest available CPI observation at or before each date.
+## Fixed Constants
+- `TRADING_DAYS_PER_YEAR = 252`
+- `TQQQ_MER_ANNUAL = 0.0084`
+- `UPRO_MER_ANNUAL = 0.0091`
+- `QLD_MER_ANNUAL = 0.0095`
+- `SP500_MIN_DATE = 1957-03-04`
+- `NASDAQ_MIN_DATE = 1971-02-05`
+
+These are intentionally constants, not CLI flags.
+
+## Supported Analysis Securities
+- `TQQQ`
+- `UPRO`
+- `QLD`
+- `NASDAQ`
+- `SP500` (aliases accepted: `S&P`, `S&P500`)
+
+## Analysis API Outputs
+`analysis.py` returns structured results (`SecurityAnalysisResult`) containing:
+- requested + actual start/end dates
+- start/end nominal values
+- start/end real values
+- nominal CAGR
+- real CAGR
+
+A print helper outputs the same values to command line while still returning results for reuse.
 
 ## Readability/Modularity Standards
 - Keep business logic small and single-purpose per module.
@@ -53,16 +73,8 @@ Build a readable, modular Python application that estimates CAGR-related synthet
 - Use type hints and concise docstrings for non-trivial functions.
 - Prefer deterministic unit tests for math-heavy logic.
 
-## Dependency Notes
-- Runtime:
-  - `pandas`
-  - `pandas-datareader` (primary FRED integration)
-  - `requests` (session support and network stack)
-- Testing:
-  - `pytest` (optional alongside built-in `unittest`)
-
 ## Next Planned Additions
-- Backtesting tests comparing synthetic TQQQ/UPRO values against real ETF history over overlapping date ranges.
+- Backtesting tests comparing synthetic TQQQ/UPRO/QLD values against real ETF history over overlapping date ranges.
 - Additional drag/adjustment factors beyond MER.
 - Optional incremental update mode (append/update) if needed; current mode recomputes full CSV each run.
 
@@ -77,3 +89,11 @@ Build a readable, modular Python application that estimates CAGR-related synthet
   - Added continuous refresh option with `--interval-seconds` for always-updating CSV behavior.
   - Installed and adopted `pandas-datareader` for FRED pulls.
   - Installed `pytest` and added it to project dependencies.
+  - Added QLD synthetic series support (2x NASDAQ with fixed MER).
+  - Added CAGR analysis API + CLI with start/end dates, security selection, and starting nominal value.
+  - Locked MER and trading-day assumptions as constants (not CLI flags).
+  - Added repository/package `__init__.py` markers to support cleaner imports.
+  - Enforced historical floor dates: S&P/UPRO from 1957-03-04 and NASDAQ/TQQQ/QLD from 1971-02-05.
+  - Added automatic S&P data-source fallback to Stooq when FRED history is truncated to ~10 years.
+  - Rebased analysis real-value outputs so nominal and real start at the same value.
+  - Updated CLI analysis formatting to currency (`$`) with 2 decimals and CAGR with 2 decimals.

@@ -1,6 +1,11 @@
 # app
 
-CLI entrypoints for running data refresh workflows.
+CLI entrypoints.
 
-- `update_dataset.py`: Pulls FRED data, computes synthetic TQQQ/UPRO, inflation-adjusts values, and writes CSV output.
-  - Supports one-shot mode and continuous mode via `--interval-seconds`.
+- `update_dataset.py`
+  - Refreshes `data/security_estimates.csv` from FRED.
+  - Supports one-shot and interval modes via `--interval-seconds`.
+- `analyze_cagr.py`
+  - Main analysis CLI.
+  - Accepts `--start-date`, `--end-date`, `--security`, and `--starting-nominal-value`.
+  - Prints start/end nominal + real values and CAGR outputs.
