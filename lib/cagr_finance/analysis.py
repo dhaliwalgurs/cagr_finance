@@ -18,6 +18,11 @@ from .config import (
 )
 from .pipeline import build_security_dataset
 
+GREEN = "\033[92m"
+BLUE = "\033[94m"
+RED = "\033[91m"
+RESET = "\033[0m"
+
 
 @dataclass(frozen=True)
 class SecurityAnalysisResult:
@@ -235,7 +240,7 @@ def print_analysis_results(results: Iterable[SecurityAnalysisResult]) -> None:
     """Print analysis summaries to the command line."""
 
     for result in results:
-        print(f"Security: {result.security}")
+        print(f"{RED}Security: {result.security}{RESET}")
         print(
             "Requested window: "
             f"{result.requested_start_date.date()} to {result.requested_end_date.date()}"
@@ -245,15 +250,15 @@ def print_analysis_results(results: Iterable[SecurityAnalysisResult]) -> None:
             f"{result.actual_start_date.date()} to {result.actual_end_date.date()}"
         )
         print(
-            f"Nominal: ${result.start_nominal_value:,.2f} -> "
-            f"${result.end_nominal_value:,.2f}"
+            f"{GREEN}Nominal: ${result.start_nominal_value:,.2f} -> "
+            f"${result.end_nominal_value:,.2f}{RESET}"
         )
         print(
-            f"Real: ${result.start_real_value:,.2f} -> "
-            f"${result.end_real_value:,.2f}"
+            f"{GREEN}Real: ${result.start_real_value:,.2f} -> "
+            f"${result.end_real_value:,.2f}{RESET}"
         )
-        print(f"Nominal CAGR: {result.nominal_cagr * 100:.2f}%")
-        print(f"Real CAGR: {result.real_cagr * 100:.2f}%")
+        print(f"{BLUE}Nominal CAGR: {result.nominal_cagr * 100:.2f}%{RESET}")
+        print(f"{BLUE}Real CAGR: {result.real_cagr * 100:.2f}%{RESET}")
         print()
 
 
