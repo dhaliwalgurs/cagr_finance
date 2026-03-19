@@ -201,6 +201,10 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Project source lives under the repository's /lib directory.
+!/lib/
+!/lib/**
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
