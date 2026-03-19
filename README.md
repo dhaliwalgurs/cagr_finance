@@ -84,6 +84,8 @@ CLI output includes:
 - end nominal value
 - start real value
 - end real value
+- nominal simple return
+- real simple return
 - nominal CAGR
 - real CAGR
 
@@ -91,6 +93,8 @@ Example formatting:
 ```text
 Nominal: $100.00 -> $492.13
 Real: $100.00 -> $494.28
+Nominal Return: 392.13%
+Real Return: 394.28%
 Nominal CAGR: 22.40%
 Real CAGR: 22.48%
 ```

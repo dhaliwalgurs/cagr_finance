@@ -97,3 +97,4 @@ A print helper outputs the same values to command line while still returning res
   - Added automatic S&P data-source fallback to Stooq when FRED history is truncated to ~10 years.
   - Rebased analysis real-value outputs so nominal and real start at the same value.
   - Updated CLI analysis formatting to currency (`$`) with 2 decimals and CAGR with 2 decimals.
+  - Added nominal/real simple rate of return outputs for the selected date window.

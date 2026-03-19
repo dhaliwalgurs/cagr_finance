@@ -20,6 +20,8 @@ from .pipeline import build_security_dataset
 
 GREEN = "\033[92m"
 BLUE = "\033[94m"
+LIGHT_ORANGE = "\033[38;5;215m"
+ORANGE = "\033[38;5;208m"
 RED = "\033[91m"
 RESET = "\033[0m"
 
@@ -37,6 +39,8 @@ class SecurityAnalysisResult:
     end_nominal_value: float
     start_real_value: float
     end_real_value: float
+    nominal_simple_return: float
+    real_simple_return: float
     nominal_cagr: float
     real_cagr: float
 
@@ -96,6 +100,12 @@ def _calculate_cagr(
     return (end_value / start_value) ** (1.0 / elapsed_years) - 1.0
 
 
+def _calculate_simple_return(*, start_value: float, end_value: float) -> float:
+    if start_value <= 0:
+        raise ValueError("Simple return requires a positive start value.")
+    return (end_value / start_value) - 1.0
+
+
 def analyze_security_from_dataset(
     dataset: pd.DataFrame,
     *,
@@ -140,6 +150,15 @@ def analyze_security_from_dataset(
     start_real_value = start_nominal_value
     end_real_value = start_real_value * real_growth_multiplier
 
+    nominal_simple_return = _calculate_simple_return(
+        start_value=start_nominal_value,
+        end_value=end_nominal_value,
+    )
+    real_simple_return = _calculate_simple_return(
+        start_value=start_real_value,
+        end_value=end_real_value,
+    )
+
     nominal_cagr = _calculate_cagr(
         start_value=start_nominal_value,
         end_value=end_nominal_value,
@@ -163,6 +182,8 @@ def analyze_security_from_dataset(
         end_nominal_value=end_nominal_value,
         start_real_value=start_real_value,
         end_real_value=end_real_value,
+        nominal_simple_return=nominal_simple_return,
+        real_simple_return=real_simple_return,
         nominal_cagr=nominal_cagr,
         real_cagr=real_cagr,
     )
@@ -257,8 +278,10 @@ def print_analysis_results(results: Iterable[SecurityAnalysisResult]) -> None:
             f"{GREEN}Real: ${result.start_real_value:,.2f} -> "
             f"${result.end_real_value:,.2f}{RESET}"
         )
-        print(f"{BLUE}Nominal CAGR: {result.nominal_cagr * 100:.2f}%{RESET}")
-        print(f"{BLUE}Real CAGR: {result.real_cagr * 100:.2f}%{RESET}")
+        print(f"{LIGHT_ORANGE}Nominal Return: {result.nominal_simple_return * 100:.2f}%{RESET}")
+        print(f"{LIGHT_ORANGE}Real Return: {result.real_simple_return * 100:.2f}%{RESET}")
+        print(f"{ORANGE}Nominal CAGR: {result.nominal_cagr * 100:.2f}%{RESET}")
+        print(f"{ORANGE}Real CAGR: {result.real_cagr * 100:.2f}%{RESET}")
         print()
 
 

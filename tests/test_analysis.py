@@ -61,6 +61,8 @@ class AnalysisTests(unittest.TestCase):
         self.assertAlmostEqual(result.end_nominal_value, 121.0, places=9)
         self.assertAlmostEqual(result.start_real_value, 100.0, places=9)
         self.assertAlmostEqual(result.end_real_value, 118.0, places=9)
+        self.assertAlmostEqual(result.nominal_simple_return, 0.21, places=9)
+        self.assertAlmostEqual(result.real_simple_return, 0.18, places=9)
 
         # Real series is rebased to nominal start value.
         self.assertNotAlmostEqual(float(frame[TQQQ_REAL_COL].iloc[0]), result.start_real_value, places=9)
