@@ -92,11 +92,14 @@ def fetch_stooq_close_series(
     *,
     start_date: str,
     end_date: Optional[str] = None,
+    allow_missing_close: bool = False,
 ) -> pd.DataFrame:
     """Fetch close prices from Stooq and normalize schema."""
 
     frame = pdr.DataReader(symbol, "stooq", start=start_date, end=end_date).reset_index()
     if "Close" not in frame.columns:
+        if allow_missing_close:
+            return pd.DataFrame(columns=[DATE_COL, output_column])
         raise ValueError(f"Stooq response for {symbol} missing column: Close")
 
     frame = frame.rename(columns={frame.columns[0]: DATE_COL, "Close": output_column})
@@ -188,17 +191,20 @@ def fetch_default_series(
             TQQQ_NOMINAL_COL,
             start_date=start_date,
             end_date=end_date,
+            allow_missing_close=True,
         ),
         upro=fetch_stooq_close_series(
             UPRO_STOOQ_SYMBOL,
             UPRO_NOMINAL_COL,
             start_date=start_date,
             end_date=end_date,
+            allow_missing_close=True,
         ),
         qld=fetch_stooq_close_series(
             QLD_STOOQ_SYMBOL,
             QLD_NOMINAL_COL,
             start_date=start_date,
             end_date=end_date,
+            allow_missing_close=True,
         ),
     )

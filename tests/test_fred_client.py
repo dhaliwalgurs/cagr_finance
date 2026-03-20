@@ -8,10 +8,32 @@ from unittest.mock import patch
 import pandas as pd
 
 from lib.cagr_finance.config import DATE_COL, SP500_NOMINAL_COL
-from lib.cagr_finance.fred_client import fetch_default_series, fetch_sp500_nominal_series
+from lib.cagr_finance.fred_client import (
+    fetch_default_series,
+    fetch_sp500_nominal_series,
+    fetch_stooq_close_series,
+)
 
 
 class FredClientTests(unittest.TestCase):
+    @patch("lib.cagr_finance.fred_client.pdr.DataReader")
+    def test_fetch_stooq_close_series_allows_missing_close_for_empty_actual_history(
+        self,
+        mock_data_reader,
+    ) -> None:
+        mock_data_reader.return_value = pd.DataFrame({"Date": []})
+
+        frame = fetch_stooq_close_series(
+            "TQQQ",
+            "TQQQ in nominal terms",
+            start_date="2000-01-01",
+            end_date="2002-01-01",
+            allow_missing_close=True,
+        )
+
+        self.assertTrue(frame.empty)
+        self.assertEqual(list(frame.columns), [DATE_COL, "TQQQ in nominal terms"])
+
     @patch("lib.cagr_finance.fred_client.fetch_stooq_close_series")
     @patch("lib.cagr_finance.fred_client.fetch_sp500_nominal_series")
     @patch("lib.cagr_finance.fred_client.fetch_fred_series")
