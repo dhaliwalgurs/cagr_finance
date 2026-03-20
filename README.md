@@ -4,8 +4,10 @@ Estimate CAGR and start/end values for index-linked leveraged securities across 
 
 ## Focus
 - Clean, modular Python code with reusable functions.
-- FRED-backed source data.
-- Synthetic leveraged paths for `TQQQ`, `UPRO`, and `QLD`.
+- FRED- and Stooq-backed source data.
+- Hybrid leveraged paths for `TQQQ`, `UPRO`, and `QLD`:
+  - synthetic before ETF inception
+  - actual ETF close history from inception onward
 - Date-window analysis for:
   - `TQQQ`
   - `UPRO`
@@ -16,16 +18,20 @@ Estimate CAGR and start/end values for index-linked leveraged securities across 
 ## Data + Modeling Notes
 - FRED series IDs:
   - `NASDAQCOM`
+  - `NASDAQ100`
   - `SP500`
   - `CPIAUCSL`
 - Source behavior:
-  - NASDAQ and CPI are fetched from FRED.
+  - NASDAQ Composite, NASDAQ-100, and CPI are fetched from FRED.
   - S&P uses FRED when full history is available, with automatic Stooq fallback for pre-2016 history (FRED daily licensing currently limits SP500 to ~10 years).
+  - TQQQ, UPRO, and QLD actual close history is fetched from Stooq and scaled to the modeled path at first overlap.
 - Enforced historical floors:
   - `SP500` and `UPRO` modeled from `1957-03-04`
-  - `NASDAQ`, `TQQQ`, and `QLD` modeled from `1971-02-05`
+  - `NASDAQ` modeled from `1971-02-05`
+  - `TQQQ` and `QLD` synthetic history is limited by NASDAQ-100 availability
 - Leveraged formula (daily):
   - `leveraged_return = leverage * index_daily_return - (annual_mer / trading_days_per_year)`
+- Analysis windows anchor the start of a request to the last available market close on or before the requested start date.
 - Constants (not CLI flags):
   - `TRADING_DAYS_PER_YEAR = 252`
   - `TQQQ_MER_ANNUAL = 0.0084`

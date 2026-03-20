@@ -12,12 +12,14 @@ from lib.cagr_finance.fred_client import fetch_default_series, fetch_sp500_nomin
 
 
 class FredClientTests(unittest.TestCase):
+    @patch("lib.cagr_finance.fred_client.fetch_stooq_close_series")
     @patch("lib.cagr_finance.fred_client.fetch_sp500_nominal_series")
     @patch("lib.cagr_finance.fred_client.fetch_fred_series")
     def test_fetch_default_series_enforces_history_floors(
         self,
         mock_fetch_fred_series,
         mock_fetch_sp500_nominal_series,
+        mock_fetch_stooq_close_series,
     ) -> None:
         def _frame_for(output_column: str) -> pd.DataFrame:
             return pd.DataFrame({DATE_COL: [pd.Timestamp("2020-01-01")], output_column: [1.0]})
@@ -26,18 +28,24 @@ class FredClientTests(unittest.TestCase):
             lambda _series_id, output_column, **_kwargs: _frame_for(output_column)
         )
         mock_fetch_sp500_nominal_series.return_value = _frame_for(SP500_NOMINAL_COL)
+        mock_fetch_stooq_close_series.side_effect = (
+            lambda _symbol, output_column, **_kwargs: _frame_for(output_column)
+        )
 
         fetch_default_series(start_date="1900-01-01", end_date="2020-01-02")
 
         nasdaq_call = mock_fetch_fred_series.call_args_list[0]
-        cpi_call = mock_fetch_fred_series.call_args_list[1]
+        nasdaq100_call = mock_fetch_fred_series.call_args_list[1]
+        cpi_call = mock_fetch_fred_series.call_args_list[2]
 
         self.assertEqual(nasdaq_call.kwargs["start_date"], "1971-02-05")
+        self.assertEqual(nasdaq100_call.kwargs["start_date"], "1985-10-01")
         self.assertEqual(cpi_call.kwargs["start_date"], "1900-01-01")
 
         mock_fetch_sp500_nominal_series.assert_called_once()
         sp500_call = mock_fetch_sp500_nominal_series.call_args_list[0]
         self.assertEqual(sp500_call.kwargs["start_date"], "1957-03-04")
+        self.assertEqual(mock_fetch_stooq_close_series.call_count, 3)
 
     @patch("lib.cagr_finance.fred_client.fetch_stooq_close_series")
     @patch("lib.cagr_finance.fred_client.fetch_fred_series")

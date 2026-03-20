@@ -14,11 +14,20 @@ from .config import (
     CPI_SERIES_ID,
     DATE_COL,
     NASDAQ_MIN_DATE,
+    NASDAQ_100_MIN_DATE,
+    NASDAQ_100_NOMINAL_COL,
+    NASDAQ_100_SERIES_ID,
     NASDAQ_NOMINAL_COL,
     NASDAQ_SERIES_ID,
+    QLD_NOMINAL_COL,
+    QLD_STOOQ_SYMBOL,
     SP500_MIN_DATE,
     SP500_NOMINAL_COL,
     SP500_SERIES_ID,
+    TQQQ_NOMINAL_COL,
+    TQQQ_STOOQ_SYMBOL,
+    UPRO_NOMINAL_COL,
+    UPRO_STOOQ_SYMBOL,
 )
 
 
@@ -27,8 +36,12 @@ class RawSeriesBundle:
     """Container for the raw time series used by the application."""
 
     nasdaq: pd.DataFrame
+    nasdaq100: pd.DataFrame
     sp500: pd.DataFrame
     cpi: pd.DataFrame
+    tqqq: pd.DataFrame
+    upro: pd.DataFrame
+    qld: pd.DataFrame
 
 
 def _max_start_date(requested_start: str, enforced_floor: str) -> str:
@@ -137,9 +150,10 @@ def fetch_default_series(
     cpi_end_date: Optional[str] = None,
     session: Optional[requests.Session] = None,
 ) -> RawSeriesBundle:
-    """Fetch NASDAQ, S&P 500, and CPI using default FRED series identifiers."""
+    """Fetch core index, CPI, and actual ETF series using default identifiers."""
 
     nasdaq_start = _max_start_date(start_date, NASDAQ_MIN_DATE)
+    nasdaq100_start = _max_start_date(start_date, NASDAQ_100_MIN_DATE)
     sp500_start = _max_start_date(start_date, SP500_MIN_DATE)
 
     return RawSeriesBundle(
@@ -147,6 +161,13 @@ def fetch_default_series(
             NASDAQ_SERIES_ID,
             NASDAQ_NOMINAL_COL,
             start_date=nasdaq_start,
+            end_date=end_date,
+            session=session,
+        ),
+        nasdaq100=fetch_fred_series(
+            NASDAQ_100_SERIES_ID,
+            NASDAQ_100_NOMINAL_COL,
+            start_date=nasdaq100_start,
             end_date=end_date,
             session=session,
         ),
@@ -161,5 +182,23 @@ def fetch_default_series(
             start_date=cpi_start_date,
             end_date=cpi_end_date,
             session=session,
+        ),
+        tqqq=fetch_stooq_close_series(
+            TQQQ_STOOQ_SYMBOL,
+            TQQQ_NOMINAL_COL,
+            start_date=start_date,
+            end_date=end_date,
+        ),
+        upro=fetch_stooq_close_series(
+            UPRO_STOOQ_SYMBOL,
+            UPRO_NOMINAL_COL,
+            start_date=start_date,
+            end_date=end_date,
+        ),
+        qld=fetch_stooq_close_series(
+            QLD_STOOQ_SYMBOL,
+            QLD_NOMINAL_COL,
+            start_date=start_date,
+            end_date=end_date,
         ),
     )

@@ -12,6 +12,7 @@ from .config import (
     AppSettings,
     DATE_COL,
     LEVERAGED_SECURITY_SPECS,
+    NASDAQ_100_NOMINAL_COL,
     NASDAQ_NOMINAL_COL,
     NASDAQ_REAL_COL,
     OUTPUT_COLUMNS,
@@ -20,7 +21,7 @@ from .config import (
     TRADING_DAYS_PER_YEAR,
 )
 from .fred_client import fetch_default_series
-from .leveraged import calculate_leveraged_series
+from .leveraged import calculate_leveraged_series, overlay_actual_series
 from .transform import add_real_terms_column, build_inflation_factor_frame
 
 
@@ -44,12 +45,18 @@ def build_security_dataset(
 
     index_frame_by_column = {
         NASDAQ_NOMINAL_COL: raw.nasdaq,
+        NASDAQ_100_NOMINAL_COL: raw.nasdaq100,
         SP500_NOMINAL_COL: raw.sp500,
+    }
+    actual_frame_by_symbol = {
+        "TQQQ": raw.tqqq,
+        "UPRO": raw.upro,
+        "QLD": raw.qld,
     }
     leveraged_frames: list[pd.DataFrame] = []
     for spec in LEVERAGED_SECURITY_SPECS:
         source_frame = index_frame_by_column[spec.underlying_column]
-        leveraged_frames.append(
+        modeled_frame = (
             calculate_leveraged_series(
                 source_frame,
                 spec.underlying_column,
@@ -57,6 +64,13 @@ def build_security_dataset(
                 annual_mer=spec.annual_mer,
                 start_value=active_settings.leveraged_start_value,
                 trading_days_per_year=TRADING_DAYS_PER_YEAR,
+                output_column=spec.output_nominal_column,
+            )
+        )
+        leveraged_frames.append(
+            overlay_actual_series(
+                modeled_frame,
+                actual_frame_by_symbol[spec.symbol],
                 output_column=spec.output_nominal_column,
             )
         )

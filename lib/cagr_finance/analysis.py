@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable, Optional
+from dataclasses import dataclass, replace
+from typing import Callable, Iterable, Optional
 
 import pandas as pd
 import requests
@@ -82,6 +82,12 @@ def _parse_date(date_value: str | pd.Timestamp) -> pd.Timestamp:
     return parsed.normalize()
 
 
+def _expand_start_date_for_anchor(date_value: str | pd.Timestamp, days: int = 7) -> str:
+    """Fetch a small buffer before the requested start so non-trading days can anchor."""
+
+    return str((_parse_date(date_value) - pd.Timedelta(days=days)).date())
+
+
 def _calculate_cagr(
     *,
     start_value: float,
@@ -125,19 +131,28 @@ def analyze_security_from_dataset(
         raise ValueError("start_date must be earlier than or equal to end_date.")
 
     nominal_col, real_col = SECURITY_COLUMN_MAP[symbol]
-    window = dataset.loc[
-        (dataset[DATE_COL] >= requested_start) & (dataset[DATE_COL] <= requested_end),
-        [DATE_COL, nominal_col, real_col],
-    ].dropna(subset=[nominal_col, real_col])
+    security_frame = dataset[[DATE_COL, nominal_col, real_col]].dropna(subset=[nominal_col, real_col])
+    security_frame = security_frame.sort_values(DATE_COL).reset_index(drop=True)
 
-    if window.empty:
+    start_window = security_frame.loc[security_frame[DATE_COL] <= requested_start]
+    start_fallback_to_future = False
+    if start_window.empty:
+        start_window = security_frame.loc[security_frame[DATE_COL] >= requested_start]
+        start_fallback_to_future = True
+
+    end_window = security_frame.loc[security_frame[DATE_COL] <= requested_end]
+
+    if start_window.empty or end_window.empty:
         raise ValueError(
             f"No data for {symbol} between {requested_start.date()} and {requested_end.date()}."
         )
 
-    window = window.sort_values(DATE_COL).reset_index(drop=True)
-    first = window.iloc[0]
-    last = window.iloc[-1]
+    first = start_window.iloc[0] if start_fallback_to_future else start_window.iloc[-1]
+    last = end_window.iloc[-1]
+    if pd.Timestamp(first[DATE_COL]) >= pd.Timestamp(last[DATE_COL]):
+        raise ValueError(
+            f"No data for {symbol} between {requested_start.date()} and {requested_end.date()}."
+        )
 
     start_nominal_value = float(first[nominal_col])
     end_nominal_value = float(last[nominal_col])
@@ -217,9 +232,10 @@ def analyze_securities_period(
             seen.add(symbol)
 
     settings = AppSettings(leveraged_start_value=starting_nominal_value)
+    dataset_start_date = _expand_start_date_for_anchor(start_date)
     dataset = build_security_dataset(
         settings=settings,
-        start_date=start_date,
+        start_date=dataset_start_date,
         end_date=end_date,
         session=session,
     )
@@ -234,7 +250,31 @@ def analyze_securities_period(
                 end_date=end_date,
             )
         )
-    return results
+
+    if len(results) == 1:
+        return results
+
+    common_actual_start = max(result.actual_start_date for result in results)
+    common_actual_end = min(result.actual_end_date for result in results)
+    if common_actual_start >= common_actual_end:
+        raise ValueError("Selected securities do not share an overlapping actual date range.")
+
+    standardized_results: list[SecurityAnalysisResult] = []
+    for result in results:
+        standardized = analyze_security_from_dataset(
+            dataset,
+            security=result.security,
+            start_date=common_actual_start,
+            end_date=common_actual_end,
+        )
+        standardized_results.append(
+            replace(
+                standardized,
+                requested_start_date=result.requested_start_date,
+                requested_end_date=result.requested_end_date,
+            )
+        )
+    return standardized_results
 
 
 def analyze_security_period(
@@ -257,32 +297,86 @@ def analyze_security_period(
     return results[0]
 
 
-def print_analysis_results(results: Iterable[SecurityAnalysisResult]) -> None:
+def _format_currency(value: float) -> str:
+    return f"${value:,.2f}"
+
+
+def _format_percentage(value: float) -> str:
+    return f"{value * 100:.2f}%"
+
+
+def _build_results_table(
+    results: list[SecurityAnalysisResult],
+    *,
+    starting_nominal_value: float,
+) -> str:
+    row_specs: list[tuple[str, str, Callable[[SecurityAnalysisResult], str]]] = [
+        (
+            "Nominal",
+            GREEN,
+            lambda result: _format_currency(starting_nominal_value * (1.0 + result.nominal_simple_return)),
+        ),
+        (
+            "Real",
+            GREEN,
+            lambda result: _format_currency(starting_nominal_value * (1.0 + result.real_simple_return)),
+        ),
+        ("Nominal CAGR", ORANGE, lambda result: _format_percentage(result.nominal_cagr)),
+        ("Real CAGR", ORANGE, lambda result: _format_percentage(result.real_cagr)),
+        ("Nominal Return", LIGHT_ORANGE, lambda result: _format_percentage(result.nominal_simple_return)),
+        ("Real Return", LIGHT_ORANGE, lambda result: _format_percentage(result.real_simple_return)),
+    ]
+
+    metric_header = "Metric"
+    first_column_width = max(len(metric_header), *(len(label) for label, _, _ in row_specs))
+    security_widths = []
+    for result in results:
+        values = [formatter(result) for _, _, formatter in row_specs]
+        security_widths.append(max(len(result.security), *(len(value) for value in values)))
+
+    def _format_row(cells: list[str]) -> str:
+        padded_cells = [cells[0].ljust(first_column_width)]
+        for index, cell in enumerate(cells[1:]):
+            padded_cells.append(cell.ljust(security_widths[index]))
+        return " | ".join(padded_cells)
+
+    header_cells = [metric_header, *(result.security for result in results)]
+    divider_cells = ["-" * first_column_width, *("-" * width for width in security_widths)]
+
+    lines = [f"{BLUE}{_format_row(header_cells)}{RESET}", _format_row(divider_cells)]
+    for label, color, formatter in row_specs:
+        row_cells = [label, *(formatter(result) for result in results)]
+        lines.append(f"{color}{_format_row(row_cells)}{RESET}")
+    return "\n".join(lines)
+
+
+def print_analysis_results(
+    results: Iterable[SecurityAnalysisResult],
+    *,
+    starting_nominal_value: float,
+) -> None:
     """Print analysis summaries to the command line."""
 
-    for result in results:
-        print(f"{RED}Security: {result.security}{RESET}")
-        print(
-            "Requested window: "
-            f"{result.requested_start_date.date()} to {result.requested_end_date.date()}"
+    materialized_results = list(results)
+    if not materialized_results:
+        return
+
+    requested_start = materialized_results[0].requested_start_date
+    requested_end = materialized_results[0].requested_end_date
+    actual_start = materialized_results[0].actual_start_date
+    actual_end = materialized_results[0].actual_end_date
+
+    print(f"{RED}Requested window:{RESET} {requested_start.date()} to {requested_end.date()}")
+    print(f"{RED}Actual window:{RESET}    {actual_start.date()} to {actual_end.date()}")
+    print(f"{RED}Starting value:{RESET}   {_format_currency(starting_nominal_value)}")
+    print()
+    print(
+        _build_results_table(
+            materialized_results,
+            starting_nominal_value=starting_nominal_value,
         )
-        print(
-            "Actual window: "
-            f"{result.actual_start_date.date()} to {result.actual_end_date.date()}"
-        )
-        print(
-            f"{GREEN}Nominal: ${result.start_nominal_value:,.2f} -> "
-            f"${result.end_nominal_value:,.2f}{RESET}"
-        )
-        print(
-            f"{GREEN}Real: ${result.start_real_value:,.2f} -> "
-            f"${result.end_real_value:,.2f}{RESET}"
-        )
-        print(f"{LIGHT_ORANGE}Nominal Return: {result.nominal_simple_return * 100:.2f}%{RESET}")
-        print(f"{LIGHT_ORANGE}Real Return: {result.real_simple_return * 100:.2f}%{RESET}")
-        print(f"{ORANGE}Nominal CAGR: {result.nominal_cagr * 100:.2f}%{RESET}")
-        print(f"{ORANGE}Real CAGR: {result.real_cagr * 100:.2f}%{RESET}")
-        print()
+    )
+    print()
 
 
 def analyze_securities_period_and_print(
@@ -302,7 +396,7 @@ def analyze_securities_period_and_print(
         starting_nominal_value=starting_nominal_value,
         session=session,
     )
-    print_analysis_results(results)
+    print_analysis_results(results, starting_nominal_value=starting_nominal_value)
     return results
 
 
@@ -323,5 +417,5 @@ def analyze_security_period_and_print(
         starting_nominal_value=starting_nominal_value,
         session=session,
     )
-    print_analysis_results([result])
+    print_analysis_results([result], starting_nominal_value=starting_nominal_value)
     return result

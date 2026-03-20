@@ -7,15 +7,18 @@ from pathlib import Path
 from typing import Mapping
 
 NASDAQ_SERIES_ID = "NASDAQCOM"
+NASDAQ_100_SERIES_ID = "NASDAQ100"
 SP500_SERIES_ID = "SP500"
 CPI_SERIES_ID = "CPIAUCSL"
 
 # Historical floor dates we intentionally enforce for modeled output.
 NASDAQ_MIN_DATE = "1971-02-05"
+NASDAQ_100_MIN_DATE = "1985-10-01"
 SP500_MIN_DATE = "1957-03-04"
 
 DATE_COL = "date"
 NASDAQ_NOMINAL_COL = "NASDAQ nominal value"
+NASDAQ_100_NOMINAL_COL = "NASDAQ-100 nominal value"
 SP500_NOMINAL_COL = "S&P nominal value"
 CPI_INDEX_COL = "CPI index"
 INFLATION_FACTOR_COL = "inflation factor"
@@ -27,6 +30,10 @@ QLD_NOMINAL_COL = "QLD in nominal terms"
 TQQQ_REAL_COL = "TQQQ in real terms"
 UPRO_REAL_COL = "UPRO in real terms"
 QLD_REAL_COL = "QLD in real terms"
+
+TQQQ_STOOQ_SYMBOL = "TQQQ"
+UPRO_STOOQ_SYMBOL = "UPRO"
+QLD_STOOQ_SYMBOL = "QLD"
 
 TRADING_DAYS_PER_YEAR = 252
 DEFAULT_STARTING_NOMINAL_VALUE = 100.0
@@ -77,7 +84,7 @@ class LeveragedSecuritySpec:
 LEVERAGED_SECURITY_SPECS: tuple[LeveragedSecuritySpec, ...] = (
     LeveragedSecuritySpec(
         symbol="TQQQ",
-        underlying_column=NASDAQ_NOMINAL_COL,
+        underlying_column=NASDAQ_100_NOMINAL_COL,
         output_nominal_column=TQQQ_NOMINAL_COL,
         output_real_column=TQQQ_REAL_COL,
         leverage=TQQQ_LEVERAGE,
@@ -93,7 +100,7 @@ LEVERAGED_SECURITY_SPECS: tuple[LeveragedSecuritySpec, ...] = (
     ),
     LeveragedSecuritySpec(
         symbol="QLD",
-        underlying_column=NASDAQ_NOMINAL_COL,
+        underlying_column=NASDAQ_100_NOMINAL_COL,
         output_nominal_column=QLD_NOMINAL_COL,
         output_real_column=QLD_REAL_COL,
         leverage=QLD_LEVERAGE,
